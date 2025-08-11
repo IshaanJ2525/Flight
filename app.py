@@ -1,5 +1,3 @@
-# stock_forecast_app.py
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -40,9 +38,16 @@ else:
 # -------------------------------
 # GET DATA
 # -------------------------------
-st.subheader("Fetching Historical Data...")
-df = yf.download(ticker, period="5y")
-df.reset_index(inplace=True)
+try:
+    st.subheader("Fetching Historical Data...")
+    df = yf.download(ticker, period="5y")
+    if df.empty:
+        st.error("No data found for this ticker. Please try another.")
+        st.stop()
+    df.reset_index(inplace=True)
+except Exception as e:
+    st.error(f"Error fetching data: {e}")
+    st.stop()
 
 # Prepare data for Prophet
 data = df[["Date", "Close"]]
@@ -70,27 +75,30 @@ st.plotly_chart(fig1)
 # CALCULATE METRICS
 # -------------------------------
 # Use last 60 days for evaluation
-train = data[:-60]
-test = data[-60:]
+if len(data) > 60:
+    train = data[:-60]
+    test = data[-60:]
 
-model_eval = Prophet(daily_seasonality=True)
-model_eval.fit(train)
-future_eval = model_eval.make_future_dataframe(periods=60)
-forecast_eval = model_eval.predict(future_eval)
+    model_eval = Prophet(daily_seasonality=True)
+    model_eval.fit(train)
+    future_eval = model_eval.make_future_dataframe(periods=60)
+    forecast_eval = model_eval.predict(future_eval)
 
-pred = forecast_eval["yhat"][-60:]
-true = test["y"].values
+    pred = forecast_eval["yhat"][-60:]
+    true = test["y"].values
 
-mae = mean_absolute_error(true, pred)
-rmse = np.sqrt(mean_squared_error(true, pred))
-mape = np.mean(np.abs((true - pred) / true)) * 100
-r2 = r2_score(true, pred)
+    mae = mean_absolute_error(true, pred)
+    rmse = np.sqrt(mean_squared_error(true, pred))
+    mape = np.mean(np.abs((true - pred) / true)) * 100
+    r2 = r2_score(true, pred)
 
-st.subheader("Forecast Accuracy Metrics")
-st.write(f"**MAE:** {mae:.2f}")
-st.write(f"**RMSE:** {rmse:.2f}")
-st.write(f"**MAPE:** {mape:.2f}%")
-st.write(f"**R² Score:** {r2:.2f}")
+    st.subheader("Forecast Accuracy Metrics")
+    st.write(f"**MAE:** {mae:.2f}")
+    st.write(f"**RMSE:** {rmse:.2f}")
+    st.write(f"**MAPE:** {mape:.2f}%")
+    st.write(f"**R² Score:** {r2:.2f}")
+else:
+    st.warning("Not enough data for metric calculation.")
 
 # -------------------------------
 # DECISION MAKER
